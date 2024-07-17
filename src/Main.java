@@ -1,14 +1,13 @@
+import javax.swing.*;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
-        // Parse provinces from CSV
         List<Province> provinces = readProvincesFromCSV("provinces_data.csv");
 
         if (provinces.isEmpty()) {
@@ -18,7 +17,6 @@ public class Main {
 
         Scanner scanner = new Scanner(System.in);
 
-        // Ask the user for the starting province
         System.out.print("Enter the province you are starting from: ");
         String startProvinceName = scanner.nextLine().trim();
         Province startProvince = findProvinceByName(provinces, startProvinceName);
@@ -28,15 +26,12 @@ public class Main {
             return;
         }
 
-        // Ask the user for the number of provinces to visit
         System.out.print("Enter the number of provinces you want to visit: ");
         int numProvinces = scanner.nextInt();
-        scanner.nextLine(); // Consume the newline character
+        scanner.nextLine();
 
         List<Province> provincesToVisit = new ArrayList<>();
-        List<Double> distances = new ArrayList<>();
 
-        // Enter connected provinces and distances
         for (int i = 0; i < numProvinces; i++) {
             System.out.println("Province " + (i + 1) + ":");
             System.out.print("Enter name of connected province: ");
@@ -48,31 +43,43 @@ public class Main {
                 return;
             }
 
-            // Calculate distance using Haversine formula
-            double distance = calculateDistance(startProvince.getLatitude(), startProvince.getLongitude(),
-                    connectedProvince.getLatitude(), connectedProvince.getLongitude());
-            distances.add(distance);
             provincesToVisit.add(connectedProvince);
         }
 
-        // Sort provincesToVisit based on distances in ascending order
-        sortItinerary(provincesToVisit, distances);
+        GraphImplementation graph = new GraphImplementation();
 
-        // Display the sorted itinerary
-        System.out.println("Your travel itinerary:");
-        System.out.println("Starting from: " + startProvince.getName());
-        for (int i = 0; i < provincesToVisit.size(); i++) {
-            Province province = provincesToVisit.get(i);
-            double distance = distances.get(i);
-            System.out.println((i + 1) + ". Province: " + province.getName());
-            System.out.printf("   Distance: %.2f kilometers%n", distance);
+        for (Province province1 : provinces) {
+            for (Province province2 : provinces) {
+                if (!province1.equals(province2)) {
+                    double distance = calculateDistance(province1.getLatitude(), province1.getLongitude(),
+                            province2.getLatitude(), province2.getLongitude());
+                    graph.addEdge(province1, province2, distance);
+                }
+            }
         }
 
-        // Close the scanner
+        List<Province> shortestPath = graph.findShortestPath(startProvince, provincesToVisit);
+        System.out.println("**********************************");
+        System.out.println("**********************************");
+        System.out.println("Your travel itinerary in Canada:");
+        for (int i = 0; i < shortestPath.size(); i++) {
+            System.out.println((i + 1) + " Province to visit:" + shortestPath.get(i).getName());
+        }
+        System.out.println("**********************************");
+        System.out.println("**********************************");
+
+        SwingUtilities.invokeLater(() -> {
+            try {
+                CanadianDeliveryMap frame = new CanadianDeliveryMap(startProvinceName, extractProvinceNames(shortestPath));
+                frame.setVisible(true);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+
         scanner.close();
     }
 
-    // Method to read provinces from CSV
     private static List<Province> readProvincesFromCSV(String filename) {
         List<Province> provinces = new ArrayList<>();
         boolean isFirstLine = true;
@@ -81,7 +88,7 @@ public class Main {
             while ((line = br.readLine()) != null) {
                 if (isFirstLine) {
                     isFirstLine = false;
-                    continue; // Skip header row
+                    continue;
                 }
                 String[] data = line.split(",");
                 if (data.length >= 3) {
@@ -98,7 +105,6 @@ public class Main {
         return provinces;
     }
 
-    // Method to find a province by name
     private static Province findProvinceByName(List<Province> provinces, String name) {
         for (Province province : provinces) {
             if (province.getName().equalsIgnoreCase(name)) {
@@ -108,10 +114,8 @@ public class Main {
         return null;
     }
 
-    // Method to calculate distance between two points given their latitude and longitude
     private static double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-        // Haversine formula
-        final int R = 6371; // Radius of the Earth
+        final int R = 6371;
 
         double latDistance = Math.toRadians(lat2 - lat1);
         double lonDistance = Math.toRadians(lon2 - lon1);
@@ -120,12 +124,14 @@ public class Main {
                 * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-        return R * c; // Distance in kilometers
+        return R * c;
     }
 
-    // Method to sort the itinerary based on distances in ascending order
-    private static void sortItinerary(List<Province> provincesToVisit, List<Double> distances) {
-        // Use Comparator to sort provincesToVisit based on distances list
-        provincesToVisit.sort(Comparator.comparingDouble(p -> distances.get(provincesToVisit.indexOf(p))));
+    private static List<String> extractProvinceNames(List<Province> provinces) {
+        List<String> names = new ArrayList<>();
+        for (Province province : provinces) {
+            names.add(province.getName());
+        }
+        return names;
     }
 }
